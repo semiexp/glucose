@@ -26,3 +26,10 @@ add_executable(glucose_ext_test ${PROJECT_SOURCE_DIR}/example/Graph.cpp ${PROJEC
 target_include_directories(glucose_ext_test PUBLIC ${PROJECT_SOURCE_DIR})
 add_dependencies(glucose_ext_test glucose_lib)
 target_link_libraries(glucose_ext_test glucose_lib)
+
+# install
+install(TARGETS glucose_lib glucose
+        RUNTIME DESTINATION bin
+        ARCHIVE DESTINATION lib)
+
+install(DIRECTORY core mtl parallel simp utils DESTINATION include/ FILES_MATCHING PATTERN "*.h")
