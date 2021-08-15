@@ -325,7 +325,7 @@ bool SimpSolver::strengthenClause(CRef cr, Lit l)
         updateElimHeap(var(l));
     }
 
-    return c.size() == 1 ? enqueue(c[0]) && propagate() == CRef_Undef : true;
+    return c.size() == 1 ? enqueue(c[0]) && !hasConflict(propagate()) : true;
 }
 
 
@@ -432,7 +432,7 @@ bool SimpSolver::implied(const vec<Lit>& c)
             uncheckedEnqueue(~c[i]);
         }
 
-    bool result = propagate() != CRef_Undef;
+    bool result = hasConflict(propagate());
     cancelUntil(0);
     return result;
 }
@@ -521,7 +521,7 @@ bool SimpSolver::asymm(Var v, CRef cr)
         else
             l = c[i];
 
-    if (propagate() != CRef_Undef){
+    if (hasConflict(propagate())){
         cancelUntil(0);
         asymm_lits++;
         if (!strengthenClause(cr, l))

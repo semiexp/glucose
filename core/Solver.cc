@@ -387,6 +387,9 @@ Var Solver::newVar(bool sign, bool dvar) {
     forceUNSAT.push(0);
     decision.push();
     trail.capacity(v + 1);
+    constr_watches.push();
+    constr_watches.push();
+    undoLists.push();
     setDecisionVar(v, dvar);
     return v;
 }
@@ -449,13 +452,35 @@ bool Solver::addClause_(vec <Lit> &ps) {
         return ok = false;
     else if(ps.size() == 1) {
         uncheckedEnqueue(ps[0]);
-        return ok = (propagate() == CRef_Undef);
+        return ok = !hasConflict(propagate());
     } else {
         CRef cr = ca.alloc(ps, false);
         clauses.push(cr);
         attachClause(cr);
     }
 
+    return true;
+}
+
+
+bool Solver::addConstraint(std::unique_ptr<Constraint>&& constr) {
+    assert(decisionLevel() == 0);
+    if (!ok) return false;
+
+    constraints.push_back(std::move(constr));
+
+    auto& constr_i = constraints.back();
+    vec<Lit> ws;
+
+    if (!constr_i->initialize(*this, ws)) {
+        return ok = false;
+    }
+    for (int i = 0; i < ws.size(); ++i) {
+        constr_watches[toInt(ws[i])].push(constr_i.get());
+    }
+    if (hasConflict(propagate())) {
+        return ok = false;
+    }
     return true;
 }
 
@@ -477,10 +502,13 @@ void Solver::attachClause(CRef cr) {
 
 
 void Solver::attachClausePurgatory(CRef cr) {
-    const Clause &c = ca[cr];
+    // TODO: this is used only by parallel solver, so currently not supported
+    abort();
 
-    assert(c.size() > 1);
-    unaryWatches[~c[0]].push(Watcher(cr, c[1]));
+    // const Clause &c = ca[cr];
+
+    // assert(c.size() > 1);
+    // unaryWatches[~c[0]].push(Watcher(cr, c[1]));
 
 }
 
@@ -516,13 +544,16 @@ void Solver::detachClause(CRef cr, bool strict) {
 // The purgatory is the 1-Watched scheme for imported clauses
 
 void Solver::detachClausePurgatory(CRef cr, bool strict) {
-    const Clause &c = ca[cr];
+    // TODO: this is used only by parallel solver, so currently not supported
+    abort();
 
-    assert(c.size() > 1);
-    if(strict)
-        remove(unaryWatches[~c[0]], Watcher(cr, c[1]));
-    else
-        unaryWatches.smudge(~c[0]);
+    // const Clause &c = ca[cr];
+
+    // assert(c.size() > 1);
+    // if(strict)
+    //     remove(unaryWatches[~c[0]], Watcher(cr, c[1]));
+    // else
+    //     unaryWatches.smudge(~c[0]);
 }
 
 
@@ -658,12 +689,17 @@ void Solver::minimisationWithBinaryResolution(vec <Lit> &out_learnt) {
 void Solver::cancelUntil(int level) {
     if(decisionLevel() > level) {
         for(int c = trail.size() - 1; c >= trail_lim[level]; c--) {
-            Var x = var(trail[c]);
+            Lit p = trail[c];
+            Var x = var(p);
             assigns[x] = l_Undef;
             if(phase_saving > 1 || ((phase_saving == 1) && c > trail_lim.last())) {
                 polarity[x] = sign(trail[c]);
             }
             insertVarOrder(x);
+            while (undoLists[x].size() > 0) {
+                undoLists[x].last()->undo(*this, p);
+                undoLists[x].pop();
+            }
         }
         qhead = trail_lim[level];
         trail.shrink(trail.size() - trail_lim[level]);
@@ -732,9 +768,10 @@ Lit Solver::pickBranchLit() {
 |        rest of literals. There may be others from the same level though.
 |  
 |________________________________________________________________________________________________@*/
-void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, int &out_btlevel, unsigned int &lbd, unsigned int &szWithoutSelectors) {
+void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec <Lit> &selectors, int &out_btlevel, unsigned int &lbd, unsigned int &szWithoutSelectors) {
     int pathC = 0;
     Lit p = lit_Undef;
+    vec<Lit> p_reason;
 
 
     // Generate conflict clause:
@@ -742,83 +779,113 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
     out_learnt.push(); // (leave room for the asserting literal)
     int index = trail.size() - 1;
     do {
-        assert(confl != CRef_Undef); // (otherwise should be UIP)
-        Clause &c = ca[confl];
-        // Special case for binary clauses
-        // The first one has to be SAT
-        if(p != lit_Undef && c.size() == 2 && value(c[0]) == l_False) {
+        assert(confl != CRef_Undef || constr != nullptr); // (otherwise should be UIP)
 
-            assert(value(c[1]) == l_True);
-            Lit tmp = c[0];
-            c[0] = c[1], c[1] = tmp;
-        }
+        if (constr != nullptr) {
+            // TODO: add optimizations for custom constraints, too
+            p_reason.clear();
+            constr->calcReason(*this, p, p_reason);
 
-        if(c.learnt()) {
-            parallelImportClauseDuringConflictAnalysis(c, confl);
-            claBumpActivity(c);
-        } else { // original clause
-            if(!c.getSeen()) {
-                stats[originalClausesSeen]++;
-                c.setSeen(true);
-            }
-        }
-
-        // DYNAMIC NBLEVEL trick (see competition'09 companion paper)
-        if(c.learnt() && c.lbd() > 2) {
-            unsigned int nblevels = computeLBD(c);
-            if(nblevels + 1 < c.lbd()) { // improve the LBD
-                if(c.lbd() <= lbLBDFrozenClause) {
-                    // seems to be interesting : keep it for the next round
-                    c.setCanBeDel(false);
-                }
-                if(chanseokStrategy && nblevels <= coLBDBound) {
-                    c.nolearnt();
-                    learnts.remove(confl);
-                    permanentLearnts.push(confl);
-                    stats[nbPermanentLearnts]++;
-
-                } else {
-                    c.setLBD(nblevels); // Update it
-                }
-            }
-        }
-
-
-        for(int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++) {
-            Lit q = c[j];
-
-            if(!seen[var(q)]) {
-                if(level(var(q)) == 0) {
-                } else { // Here, the old case
-                    if(!isSelector(var(q)))
-                        varBumpActivity(var(q));
-
-                    // This variable was responsible for a conflict,
-                    // consider it as a UNSAT assignation for this literal
-                    bumpForceUNSAT(~q); // Negation because q is false here
-
+            for (int j = 0; j < p_reason.size(); ++j) {
+                Lit q = p_reason[j];
+                if (!seen[var(q)] && level(var(q)) > 0) {
+                    varBumpActivity(var(q));
                     seen[var(q)] = 1;
-                    if(level(var(q)) >= decisionLevel()) {
+                    if (level(var(q)) >= decisionLevel())
                         pathC++;
-                        // UPDATEVARACTIVITY trick (see competition'09 companion paper)
-                        if(!isSelector(var(q)) && (reason(var(q)) != CRef_Undef) && ca[reason(var(q))].learnt())
-                            lastDecisionLevel.push(q);
+                    else
+                        out_learnt.push(~q);
+                }
+            }
+        } else {
+            Clause &c = ca[confl];
+
+            // Special case for binary clauses
+            // The first one has to be SAT
+            if(p != lit_Undef && c.size() == 2 && value(c[0]) == l_False) {
+
+                assert(value(c[1]) == l_True);
+                Lit tmp = c[0];
+                c[0] = c[1], c[1] = tmp;
+            }
+
+            if(c.learnt()) {
+                parallelImportClauseDuringConflictAnalysis(c, confl);
+                claBumpActivity(c);
+            } else { // original clause
+                if(!c.getSeen()) {
+                    stats[originalClausesSeen]++;
+                    c.setSeen(true);
+                }
+            }
+
+            // DYNAMIC NBLEVEL trick (see competition'09 companion paper)
+            if(c.learnt() && c.lbd() > 2) {
+                unsigned int nblevels = computeLBD(c);
+                if(nblevels + 1 < c.lbd()) { // improve the LBD
+                    if(c.lbd() <= lbLBDFrozenClause) {
+                        // seems to be interesting : keep it for the next round
+                        c.setCanBeDel(false);
+                    }
+                    if(chanseokStrategy && nblevels <= coLBDBound) {
+                        c.nolearnt();
+                        learnts.remove(confl);
+                        permanentLearnts.push(confl);
+                        stats[nbPermanentLearnts]++;
+
                     } else {
-                        if(isSelector(var(q))) {
-                            assert(value(q) == l_False);
-                            selectors.push(q);
-                        } else
-                            out_learnt.push(q);
+                        c.setLBD(nblevels); // Update it
                     }
                 }
-            } //else stats[sumResSeen]++;
+            }
+
+
+            for(int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++) {
+                Lit q = c[j];
+
+                if(!seen[var(q)]) {
+                    if(level(var(q)) == 0) {
+                    } else { // Here, the old case
+                        if(!isSelector(var(q)))
+                            varBumpActivity(var(q));
+
+                        // This variable was responsible for a conflict,
+                        // consider it as a UNSAT assignation for this literal
+                        bumpForceUNSAT(~q); // Negation because q is false here
+
+                        seen[var(q)] = 1;
+                        if(level(var(q)) >= decisionLevel()) {
+                            pathC++;
+                            // UPDATEVARACTIVITY trick (see competition'09 companion paper)
+                            if(!isSelector(var(q)) && (reason(var(q)) != CRef_Undef) && ca[reason(var(q))].learnt())
+                                lastDecisionLevel.push(q);
+                        } else {
+                            if(isSelector(var(q))) {
+                                assert(value(q) == l_False);
+                                selectors.push(q);
+                            } else
+                                out_learnt.push(q);
+                        }
+                    }
+                } //else stats[sumResSeen]++;
+            }
         }
 
         // Select next clause to look at:
+        int index_pre = index;
         while (!seen[var(trail[index--])]);
+        for (int i = index + 1; i <= index_pre; ++i) {
+            Lit p = trail[i];
+            Var x = var(p);
+            while (undoLists[x].size() > 0) {
+                undoLists[x].last()->undo(*this, p);
+                undoLists[x].pop();
+            }
+        }
         p = trail[index + 1];
         //stats[sumRes]++;
         confl = reason(var(p));
+        constr = nc_reason(var(p));
         seen[var(p)] = 0;
         pathC--;
 
@@ -924,6 +991,8 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
 // visiting literals at levels that cannot be removed later.
 
 bool Solver::litRedundant(Lit p, uint32_t abstract_levels) {
+    if (nc_reason(var(p)) != nullptr) return false;  // TODO: verify if this is okay
+
     analyze_stack.clear();
     analyze_stack.push(p);
     int top = analyze_toclear.size();
@@ -1002,6 +1071,17 @@ void Solver::analyzeFinal(Lit p, vec <Lit> &out_conflict) {
 }
 
 
+bool Solver::enqueue(Lit p, Constraint* from) {
+    if (value(p) != l_Undef) {
+        return value(p) != l_False;
+    }
+    assigns[var(p)] = lbool(!sign(p));
+    vardata[var(p)] = mkVarData(from, decisionLevel());
+    trail.push_(p);
+    return true;
+}
+
+
 void Solver::uncheckedEnqueue(Lit p, CRef from) {
     assert(value(p) == l_Undef);
     assigns[var(p)] = lbool(!sign(p));
@@ -1027,8 +1107,9 @@ void Solver::bumpForceUNSAT(Lit q) {
 |    Post-conditions:
 |      * the propagation queue is empty, even if there was a conflict.
 |________________________________________________________________________________________________@*/
-CRef Solver::propagate() {
+std::pair<CRef, Constraint*> Solver::propagate() {
     CRef confl = CRef_Undef;
+    Constraint* constr = nullptr;
     int num_props = 0;
     watches.cleanAll();
     watchesBin.cleanAll();
@@ -1047,7 +1128,7 @@ CRef Solver::propagate() {
             Lit imp = wbin[k].blocker;
 
             if(value(imp) == l_False) {
-                return wbin[k].cref;
+                return {wbin[k].cref, nullptr};
             }
 
             if(value(imp) == l_Undef) {
@@ -1136,11 +1217,20 @@ CRef Solver::propagate() {
         }
         ws.shrink(i - j);
 
-        // unaryWatches "propagation"
-        if(useUnaryWatched && confl == CRef_Undef) {
-            confl = propagateUnaryWatches(p);
-
+        vec<Constraint*>& ncws = constr_watches[toInt(p)];
+        for (int k = 0; k < ncws.size(); ++k) {
+            if (!ncws[k]->propagate(*this, p)) {
+                constr = ncws[k];
+                qhead = trail.size();
+                break;
+            }
         }
+        // unaryWatches "propagation"
+        if (useUnaryWatched) abort();
+        // if(useUnaryWatched && confl == CRef_Undef) {
+        //     confl = propagateUnaryWatches(p);
+
+        // }
 
     }
 
@@ -1148,7 +1238,7 @@ CRef Solver::propagate() {
     propagations += num_props;
     simpDB_props -= num_props;
 
-    return confl;
+    return {confl, constr};
 }
 
 
@@ -1325,8 +1415,7 @@ bool Solver::simplify() {
 
     if(!ok) return ok = false;
     else {
-        CRef cr = propagate();
-        if(cr != CRef_Undef) {
+        if (hasConflict(propagate())) {
             return ok = false;
         }
     }
@@ -1478,9 +1567,9 @@ lbool Solver::search(int nof_conflicts) {
                 return l_False;
 
         }
-        CRef confl = propagate();
+        std::pair<CRef, Constraint*> confl_pair = propagate();
 
-        if(confl != CRef_Undef) {
+        if(hasConflict(confl_pair)) {
             newDescent = false;
             if(parallelJobIsFinished())
                 return l_Undef;
@@ -1530,7 +1619,7 @@ lbool Solver::search(int nof_conflicts) {
             learnt_clause.clear();
             selectors.clear();
 
-            analyze(confl, learnt_clause, selectors, backtrack_level, nblevels, szWithoutSelectors);
+            analyze(confl_pair.first, confl_pair.second, learnt_clause, selectors, backtrack_level, nblevels, szWithoutSelectors);
 
             lbdQueue.push(nblevels);
             sumLBD += nblevels;
@@ -1645,7 +1734,7 @@ lbool Solver::search(int nof_conflicts) {
                 decisions++;
                 next = pickBranchLit();
                 if(next == lit_Undef) {
-                    printf("c last restart ## conflicts  :  %d %d \n", conflictC, decisionLevel());
+                    // printf("c last restart ## conflicts  :  %d %d \n", conflictC, decisionLevel());
                     // Model found:
                     return l_True;
                 }

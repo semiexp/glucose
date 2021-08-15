@@ -20,3 +20,9 @@ add_executable(glucose ${PROJECT_SOURCE_DIR}/simp/Main.cc)
 target_include_directories(glucose PUBLIC ${PROJECT_SOURCE_DIR})
 add_dependencies(glucose glucose_lib)
 target_link_libraries(glucose glucose_lib z)
+
+# build test
+add_executable(glucose_ext_test ${PROJECT_SOURCE_DIR}/example/Graph.cpp ${PROJECT_SOURCE_DIR}/example/Test.cpp)
+target_include_directories(glucose_ext_test PUBLIC ${PROJECT_SOURCE_DIR})
+add_dependencies(glucose_ext_test glucose_lib)
+target_link_libraries(glucose_ext_test glucose_lib)

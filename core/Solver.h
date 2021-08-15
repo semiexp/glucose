@@ -58,7 +58,10 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "core/Constants.h"
 #include "mtl/Clone.h"
 #include "core/SolverStats.h"
+#include "core/Constraint.h"
 
+#include <memory>
+#include <vector>
 
 namespace Glucose {
 // Core stats 
@@ -124,6 +127,8 @@ public:
     bool    addClause (Lit p, Lit q, Lit r);                    // Add a ternary clause to the solver. 
     virtual bool    addClause_(      vec<Lit>& ps);                     // Add a clause to the solver without making superflous internal copy. Will
                                                                 // change the passed vector 'ps'.
+
+    bool    addConstraint (std::unique_ptr<Constraint>&& constr);  // Add a non-clause constraint to the solver.
     // Solving:
     //
     bool    simplify     ();                        // Removes already satisfied clauses.
@@ -134,6 +139,9 @@ public:
     bool    solve        (Lit p, Lit q);            // Search for a model that respects two assumptions.
     bool    solve        (Lit p, Lit q, Lit r);     // Search for a model that respects three assumptions.
     bool    okay         () const;                  // FALSE means solver is in a conflicting state
+
+    bool    enqueue      (Lit p, Constraint* from);
+    void    registerUndo (Var v, Constraint* constr);
 
        // Convenience versions of 'toDimacs()':
     void    toDimacs     (FILE* f, const vec<Lit>& assumps);            // Write CNF to file in DIMACS-format.
@@ -284,8 +292,9 @@ protected:
     bool forceUnsatOnNewDescent;
     // Helper structures:
     //
-    struct VarData { CRef reason; int level; };
-    static inline VarData mkVarData(CRef cr, int l){ VarData d = {cr, l}; return d; }
+    struct VarData { CRef reason; Constraint* nc_reason; int level; };
+    static inline VarData mkVarData(CRef cr, int l){ VarData d = {cr, nullptr, l}; return d; }
+    static inline VarData mkVarData(Constraint* cs, int l){ VarData d = {CRef_Undef, cs, l}; return d; }
 
     struct Watcher {
         CRef cref;
@@ -332,6 +341,10 @@ protected:
     vec<CRef>           learnts;          // List of learnt clauses.
     vec<CRef>           permanentLearnts; // The list of learnts clauses kept permanently
     vec<CRef>           unaryWatchedClauses;  // List of imported clauses (after the purgatory) // TODO put inside ParallelSolver
+
+    vec<vec<Constraint*>> constr_watches; // 'watches[lit]' is a list of non-clause constraints watching 'lit'
+    vec<vec<Constraint*>> undoLists;      // 'undoLists[var]' is a list of non-clause constraints to which undo of 'var' must be notified
+    std::vector<std::unique_ptr<Constraint>> constraints;  // List of non-clause constraints.
 
     vec<lbool>          assigns;          // The current assignments.
     vec<char>           polarity;         // The preferred polarity of each variable.
@@ -402,10 +415,10 @@ protected:
     void     newDecisionLevel ();                                                      // Begins a new decision level.
     void     uncheckedEnqueue (Lit p, CRef from = CRef_Undef);                         // Enqueue a literal. Assumes value of literal is undefined.
     bool     enqueue          (Lit p, CRef from = CRef_Undef);                         // Test if fact 'p' contradicts current state, enqueue otherwise.
-    CRef     propagate        ();                                                      // Perform unit propagation. Returns possibly conflicting clause.
+    std::pair<CRef, Constraint*> propagate();                                          // Perform unit propagation. Returns possibly conflicting clause.
     CRef     propagateUnaryWatches(Lit p);                                                  // Perform propagation on unary watches of p, can find only conflicts
     void     cancelUntil      (int level);                                             // Backtrack until a certain level.
-    void     analyze          (CRef confl, vec<Lit>& out_learnt, vec<Lit> & selectors, int& out_btlevel,unsigned int &nblevels,unsigned int &szWithoutSelectors);    // (bt = backtrack)
+    void     analyze          (CRef confl, Constraint* constr, vec<Lit>& out_learnt, vec<Lit> & selectors, int& out_btlevel,unsigned int &nblevels,unsigned int &szWithoutSelectors);    // (bt = backtrack)
     void     analyzeFinal     (Lit p, vec<Lit>& out_conflict);                         // COULD THIS BE IMPLEMENTED BY THE ORDINARIY "analyze" BY SOME REASONABLE GENERALIZATION?
     bool     litRedundant     (Lit p, uint32_t abstract_levels);                       // (helper method for 'analyze()')
     lbool    search           (int nof_conflicts);                                     // Search for a given number of conflicts.
@@ -444,6 +457,7 @@ protected:
     int      decisionLevel    ()      const; // Gives the current decisionlevel.
     uint32_t abstractLevel    (Var x) const; // Used to represent an abstraction of sets of decision levels.
     CRef     reason           (Var x) const;
+    Constraint* nc_reason     (Var x) const;
     int      level            (Var x) const;
     double   progressEstimate ()      const; // DELETE THIS ?? IT'S NOT VERY USEFUL ...
     bool     withinBudget     ()      const;
@@ -462,6 +476,10 @@ protected:
     // Returns a random integer 0 <= x < size. Seed must never be 0.
     static inline int irand(double& seed, int size) {
         return (int)(drand(seed) * size); }
+
+    static bool hasConflict(const std::pair<CRef, Constraint*>& p) {
+        return p.first != CRef_Undef || p.second != nullptr;
+    }
 };
 
 
@@ -469,6 +487,7 @@ protected:
 // Implementation of inline methods:
 
 inline CRef Solver::reason(Var x) const { return vardata[x].reason; }
+inline Constraint* Solver::nc_reason(Var x) const { return vardata[x].nc_reason; }
 inline int  Solver::level (Var x) const { return vardata[x].level; }
 
 inline void Solver::insertVarOrder(Var x) {
@@ -565,6 +584,7 @@ inline void     Solver::toDimacs     (const char* file, Lit p){ vec<Lit> as; as.
 inline void     Solver::toDimacs     (const char* file, Lit p, Lit q){ vec<Lit> as; as.push(p); as.push(q); toDimacs(file, as); }
 inline void     Solver::toDimacs     (const char* file, Lit p, Lit q, Lit r){ vec<Lit> as; as.push(p); as.push(q); as.push(r); toDimacs(file, as); }
 
+inline void     Solver::registerUndo (Var v, Constraint* constr) { undoLists[v].push(constr); }
 
 
 //=================================================================================================
