@@ -22,7 +22,8 @@ add_dependencies(glucose glucose_lib)
 target_link_libraries(glucose glucose_lib z)
 
 # build test
-add_executable(glucose_ext_test ${PROJECT_SOURCE_DIR}/example/Graph.cpp ${PROJECT_SOURCE_DIR}/example/Test.cpp)
+file(GLOB_RECURSE GLUCOSE_TEST_FILES ${PROJECT_SOURCE_DIR}/example/*.cpp)
+add_executable(glucose_ext_test ${GLUCOSE_TEST_FILES} ${PROJECT_SOURCE_DIR}/example/Test.cpp)
 target_include_directories(glucose_ext_test PUBLIC ${PROJECT_SOURCE_DIR})
 add_dependencies(glucose_ext_test glucose_lib)
 target_link_libraries(glucose_ext_test glucose_lib)
