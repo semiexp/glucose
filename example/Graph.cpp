@@ -133,6 +133,8 @@ bool ActiveVerticesConnected::propagate(Solver& solver, Lit p) {
                 ++n_active_vertices_;
             } else if (val == l_False) s = kInactive;
             else abort();
+            // TODO: pass this check (this fails only when invoked from `initialize` and this does not actually cause problems, though)
+            // assert(state_[i] == kUndecided);
             state_[i] = s;
             decision_order_.push_back(i);
         }
@@ -231,9 +233,10 @@ int ActiveVerticesConnected::buildTree(int v, int parent, int cluster_id) {
     return lowlink_[v] = lowlink;
 }
 
-void ActiveVerticesConnected::calcReason(Solver& solver, Lit p, vec<Lit>& out_reason) {
+void ActiveVerticesConnected::calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) {
     if (p == lit_Undef && conflict_cause_pos_ == -2) abort();
     if (p == lit_Undef && conflict_cause_pos_ != -1) {
+        assert(conflict_cause_lit_ == extra);
         decision_order_.push_back(conflict_cause_pos_);
         if (conflict_cause_lit_ == lits_[conflict_cause_pos_]) {
             state_[conflict_cause_pos_] = kActive;

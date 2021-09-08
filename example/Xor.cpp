@@ -46,7 +46,7 @@ bool Xor::propagate(Solver& solver, Lit p) {
     solver.registerUndo(v, this);
 
     int idx = varIndex(v);
-    assert(value_[idx] != -1);
+    assert(value_[idx] == -1);
     value_[idx] = s;
     parity_ ^= s;
     --n_undecided_;
@@ -67,11 +67,11 @@ bool Xor::propagate(Solver& solver, Lit p) {
     return true;
 }
 
-void Xor::calcReason(Solver& solver, Lit p, vec<Lit>& out_reason) {
+void Xor::calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) {
     for (int i = 0; i < vars_.size(); ++i) {
         if (value_[i] != -1) {
             out_reason.push(mkLit(vars_[i], value_[i] == 0));
-        } else if (p == lit_Undef) {
+        } else if (p == lit_Undef && extra != lit_Undef) {
             out_reason.push(mkLit(vars_[i], parity_ == 1));
         }
     }

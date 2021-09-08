@@ -773,6 +773,7 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
     Lit p = lit_Undef;
     vec<Lit> p_reason;
 
+    Lit extra = enqueue_failure;
 
     // Generate conflict clause:
     //
@@ -784,7 +785,8 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
         if (constr != nullptr) {
             // TODO: add optimizations for custom constraints, too
             p_reason.clear();
-            constr->calcReason(*this, p, p_reason);
+            constr->calcReason(*this, p, extra, p_reason);
+            extra = lit_Undef;
 
             for (int j = 0; j < p_reason.size(); ++j) {
                 Lit q = p_reason[j];
@@ -1073,7 +1075,11 @@ void Solver::analyzeFinal(Lit p, vec <Lit> &out_conflict) {
 
 bool Solver::enqueue(Lit p, Constraint* from) {
     if (value(p) != l_Undef) {
-        return value(p) != l_False;
+        if (value(p) == l_False) {
+            enqueue_failure = ~p;
+            return false;
+        }
+        return true;
     }
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
@@ -1219,6 +1225,7 @@ std::pair<CRef, Constraint*> Solver::propagate() {
 
         vec<Constraint*>& ncws = constr_watches[toInt(p)];
         for (int k = 0; k < ncws.size(); ++k) {
+            enqueue_failure = lit_Undef;
             if (!ncws[k]->propagate(*this, p)) {
                 constr = ncws[k];
                 qhead = trail.size();

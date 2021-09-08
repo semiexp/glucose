@@ -15,7 +15,7 @@ public:
 
     bool initialize(Solver& solver, vec<Lit>& out_watchers) override;
     bool propagate(Solver& solver, Lit p) override;
-    void calcReason(Solver& solver, Lit p, vec<Lit>& out_reason) override;
+    void calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) override;
     void undo(Solver& solver, Lit p) override;
 
 private:

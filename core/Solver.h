@@ -345,6 +345,7 @@ protected:
     vec<vec<Constraint*>> constr_watches; // 'watches[lit]' is a list of non-clause constraints watching 'lit'
     vec<vec<Constraint*>> undoLists;      // 'undoLists[var]' is a list of non-clause constraints to which undo of 'var' must be notified
     std::vector<std::unique_ptr<Constraint>> constraints;  // List of non-clause constraints.
+    Lit                 enqueue_failure;  // The last Lit which was enqueued by a Constraint and failed.
 
     vec<lbool>          assigns;          // The current assignments.
     vec<char>           polarity;         // The preferred polarity of each variable.
