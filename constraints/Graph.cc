@@ -1,6 +1,6 @@
 // see: https://github.com/semiexp/csugar/blob/master/src/sat/graph_solver.cpp
 
-#include "example/Graph.h"
+#include "constraints/Graph.h"
 
 #include <set>
 #include <algorithm>
