@@ -8,7 +8,8 @@ namespace Glucose {
 // x is one of {domain[0], ..., domain[n - 1]}
 // lits[i] <=> (x >= domain[i + 1])
 struct LinearTerm {
-    void negate_coef();
+    // Make `coef` 1 by modifying `lits` and `domain`.
+    void normalize();
 
     std::vector<Lit> lits;
     std::vector<int> domain;
