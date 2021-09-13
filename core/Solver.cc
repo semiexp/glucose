@@ -800,6 +800,7 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
                 }
             }
         } else {
+            extra = lit_Undef;
             Clause &c = ca[confl];
 
             // Special case for binary clauses
