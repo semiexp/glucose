@@ -92,7 +92,9 @@ bool OrderEncodingLinear::propagate(Solver& solver, Lit p) {
 }
 
 void OrderEncodingLinear::calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) {
-    for (Lit l : active_lits_) out_reason.push(l);
+    for (int i = 0; i < terms_.size(); ++i) {
+        if (ub_index_[i] < terms_[i].lits.size()) out_reason.push(~terms_[i].lits[ub_index_[i]]);
+    }
     if (extra != lit_Undef) out_reason.push(extra);
 }
 
