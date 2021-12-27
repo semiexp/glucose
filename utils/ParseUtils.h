@@ -25,7 +25,11 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdio.h>
 #include <math.h>
 
+#ifdef USE_ZLIB
 #include <zlib.h>
+#else
+#include <utils/fake_zlib.h>
+#endif
 
 namespace Glucose {
 

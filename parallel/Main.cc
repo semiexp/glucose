@@ -50,7 +50,12 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <errno.h>
 
 #include <signal.h>
+
+#ifdef USE_ZLIB
 #include <zlib.h>
+#else
+#include <utils/fake_zlib.h>
+#endif
 
 
 #include "utils/System.h"
