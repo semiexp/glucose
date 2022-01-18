@@ -12,9 +12,9 @@ AtMost::AtMost(std::vector<Lit>&& lits, int threshold) : lits_(std::move(lits)),
     }
 }
 
-bool AtMost::initialize(Solver& solver, vec<Lit>& out_watchers) {
+bool AtMost::initialize(Solver& solver) {
     for (size_t i = 0; i < lits_.size(); ++i) {
-        out_watchers.push(lits_[i]);
+        solver.addWatch(lits_[i], this);
     }
 
     for (size_t i = 0; i < lits_.size(); ++i) {

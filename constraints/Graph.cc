@@ -91,7 +91,7 @@ ActiveVerticesConnected::ActiveVerticesConnected(const std::vector<Lit>& lits, c
     }
 }
 
-bool ActiveVerticesConnected::initialize(Solver& solver, vec<Lit>& out_watchers) {
+bool ActiveVerticesConnected::initialize(Solver& solver) {
     for (int i = 0; i < lits_.size(); ++i) {
         lbool val = solver.value(lits_[i]);
         if (val != l_Undef) decision_order_.push_back(i);
@@ -104,7 +104,7 @@ bool ActiveVerticesConnected::initialize(Solver& solver, vec<Lit>& out_watchers)
         lits_unique.insert(~l);
     }
     for (Lit l : lits_unique) {
-        out_watchers.push(l);
+        solver.addWatch(l, this);
     }
 
     std::set<Lit> propagate_lits;
@@ -122,6 +122,8 @@ bool ActiveVerticesConnected::initialize(Solver& solver, vec<Lit>& out_watchers)
 }
 
 bool ActiveVerticesConnected::propagate(Solver& solver, Lit p) {
+    assert(num_pending_propagation() >= 0);
+
     int n = lits_.size();
     solver.registerUndo(var(p), this);
     for (int i = 0; i < n; ++i) {
@@ -138,6 +140,11 @@ bool ActiveVerticesConnected::propagate(Solver& solver, Lit p) {
             state_[i] = s;
             decision_order_.push_back(i);
         }
+    }
+
+    if (num_pending_propagation() > 0) {
+        // lazy propagation
+        return true;
     }
 
     if (n_active_vertices_ == 0) return true;

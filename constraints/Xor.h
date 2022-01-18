@@ -10,7 +10,7 @@ public:
     Xor(const std::vector<Lit>& lits, int parity);
     virtual ~Xor() = default;
 
-    bool initialize(Solver& solver, vec<Lit>& out_watchers) override;
+    bool initialize(Solver& solver) override;
     bool propagate(Solver& solver, Lit p) override;
     void calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) override;
     void undo(Solver& solver, Lit p) override;

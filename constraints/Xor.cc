@@ -20,12 +20,12 @@ Xor::Xor(const std::vector<Lit>& lits, int parity) {
     n_undecided_ = vars_.size();
 }
 
-bool Xor::initialize(Solver& solver, vec<Lit>& out_watchers) {
+bool Xor::initialize(Solver& solver) {
     std::vector<Lit> propagate_lits;
 
     for (int i = 0; i < vars_.size(); ++i) {
-        out_watchers.push(mkLit(vars_[i]));
-        out_watchers.push(mkLit(vars_[i], true));
+        solver.addWatch(mkLit(vars_[i]), this);
+        solver.addWatch(mkLit(vars_[i], true), this);
     }
     for (int i = 0; i < vars_.size(); ++i) {
         lbool val = solver.value(vars_[i]);

@@ -129,6 +129,7 @@ public:
                                                                 // change the passed vector 'ps'.
 
     bool    addConstraint (std::unique_ptr<Constraint>&& constr);  // Add a non-clause constraint to the solver.
+    void    addWatch (Lit p, Constraint* constr);   // Register 'constr' as an watcher of literal 'p'
     // Solving:
     //
     bool    simplify     ();                        // Removes already satisfied clauses.
@@ -429,6 +430,8 @@ protected:
     void     rebuildOrderHeap ();
 
     void     adaptSolver();                                                            // Adapt solver strategies
+
+    void     addNumPendingPropagation (Lit p, int inc);
 
     // Maintaining Variable/Clause activity:
     //

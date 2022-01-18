@@ -38,13 +38,13 @@ OrderEncodingLinear::OrderEncodingLinear(std::vector<LinearTerm>&& terms, int co
     std::sort(lits_.begin(), lits_.end());
 }
 
-bool OrderEncodingLinear::initialize(Solver& solver, vec<Lit>& out_watchers) {
+bool OrderEncodingLinear::initialize(Solver& solver) {
     std::set<Lit> watchers_set;
     for (int i = 0; i < lits_.size(); ++i) {
         watchers_set.insert(~std::get<0>(lits_[i]));
     }
     for (Lit l : watchers_set) {
-        out_watchers.push(l);
+        solver.addWatch(l, this);
     }
     for (Lit l : watchers_set) {
         lbool val = solver.value(l);

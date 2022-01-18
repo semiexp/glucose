@@ -472,7 +472,7 @@ bool Solver::addConstraint(std::unique_ptr<Constraint>&& constr) {
     auto& constr_i = constraints.back();
     vec<Lit> ws;
 
-    if (!constr_i->initialize(*this, ws)) {
+    if (!constr_i->initialize(*this)) {
         return ok = false;
     }
     for (int i = 0; i < ws.size(); ++i) {
@@ -482,6 +482,11 @@ bool Solver::addConstraint(std::unique_ptr<Constraint>&& constr) {
         return ok = false;
     }
     return true;
+}
+
+
+void Solver::addWatch(Lit p, Constraint* constr) {
+    constr_watches[toInt(p)].push(constr);
 }
 
 
@@ -1085,6 +1090,8 @@ bool Solver::enqueue(Lit p, Constraint* from) {
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
     trail.push_(p);
+
+    addNumPendingPropagation(p, 1);
     return true;
 }
 
@@ -1094,6 +1101,8 @@ void Solver::uncheckedEnqueue(Lit p, CRef from) {
     assigns[var(p)] = lbool(!sign(p));
     vardata[var(p)] = mkVarData(from, decisionLevel());
     trail.push_(p);
+
+    addNumPendingPropagation(p, 1);
 }
 
 
@@ -1125,6 +1134,7 @@ std::pair<CRef, Constraint*> Solver::propagate() {
         Lit p = trail[qhead++]; // 'p' is enqueued fact to propagate.
         vec <Watcher> &ws = watches[p];
         Watcher *i, *j, *end;
+        bool skip_constr = false;
         num_props++;
 
 
@@ -1135,6 +1145,11 @@ std::pair<CRef, Constraint*> Solver::propagate() {
             Lit imp = wbin[k].blocker;
 
             if(value(imp) == l_False) {
+                addNumPendingPropagation(p, -1);
+                while (qhead < trail.size()) {
+                    Lit q = trail[qhead++];
+                    addNumPendingPropagation(q, -1);
+                }
                 return {wbin[k].cref, nullptr};
             }
 
@@ -1211,7 +1226,12 @@ std::pair<CRef, Constraint*> Solver::propagate() {
             *j++ = w;
             if(value(first) == l_False) {
                 confl = cr;
-                qhead = trail.size();
+                addNumPendingPropagation(p, -1);
+                while (qhead < trail.size()) {
+                    Lit q = trail[qhead++];
+                    addNumPendingPropagation(q, -1);
+                }
+                skip_constr = true;
                 // Copy the remaining watches:
                 while(i < end)
                     *j++ = *i++;
@@ -1224,12 +1244,20 @@ std::pair<CRef, Constraint*> Solver::propagate() {
         }
         ws.shrink(i - j);
 
+        if (skip_constr) break;
         vec<Constraint*>& ncws = constr_watches[toInt(p)];
         for (int k = 0; k < ncws.size(); ++k) {
             enqueue_failure = lit_Undef;
+            ncws[k]->num_pending_propagation_ -= 1;
             if (!ncws[k]->propagate(*this, p)) {
+                for (int l = k + 1; l < ncws.size(); ++l) {
+                    ncws[l]->num_pending_propagation_ -= 1;
+                }
                 constr = ncws[k];
-                qhead = trail.size();
+                while (qhead < trail.size()) {
+                    Lit q = trail[qhead++];
+                    addNumPendingPropagation(q, -1);
+                }
                 break;
             }
         }
@@ -1249,6 +1277,13 @@ std::pair<CRef, Constraint*> Solver::propagate() {
     return {confl, constr};
 }
 
+
+void Solver::addNumPendingPropagation(Lit p, int inc) {
+    vec<Constraint*>& ncws = constr_watches[toInt(p)];
+    for (int i = 0; i < ncws.size(); ++i) {
+        ncws[i]->num_pending_propagation_ += inc;
+    }
+}
 
 /*_________________________________________________________________________________________________
 |
@@ -1744,6 +1779,9 @@ lbool Solver::search(int nof_conflicts) {
                 if(next == lit_Undef) {
                     // printf("c last restart ## conflicts  :  %d %d \n", conflictC, decisionLevel());
                     // Model found:
+                    for (auto& constr : constraints) {
+                        assert(constr->num_pending_propagation() == 0);
+                    }
                     return l_True;
                 }
             }
