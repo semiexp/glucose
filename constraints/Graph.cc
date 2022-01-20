@@ -178,7 +178,7 @@ bool ActiveVerticesConnected::propagate(Solver& solver, Lit p) {
         }
     }
 
-    if (n_active_vertices_ <= 1 && n_all_clusters <= 1) return true;
+    if (n_active_vertices_ <= 1 && n_all_clusters == 0) return true;
 
     if (nonempty_cluster != -1) {
         for (int v = 0; v < n; ++v) {
