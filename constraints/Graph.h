@@ -27,6 +27,7 @@ private:
     int buildTree(int v, int parent, int cluster_id);
 
     std::vector<Lit> lits_;
+    std::vector<std::pair<int, int>> var_to_idx_;
     std::vector<std::vector<int>> adj_;
     std::vector<NodeState> state_;
     std::vector<int> decision_order_;

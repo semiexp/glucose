@@ -89,6 +89,10 @@ ActiveVerticesConnected::ActiveVerticesConnected(const std::vector<Lit>& lits, c
         adj_[e.first].push_back(e.second);
         adj_[e.second].push_back(e.first);
     }
+    for (int i = 0; i < lits_.size(); ++i) {
+        var_to_idx_.push_back({var(lits_[i]), i});
+    }
+    sort(var_to_idx_.begin(), var_to_idx_.end());
 }
 
 bool ActiveVerticesConnected::initialize(Solver& solver) {
@@ -126,20 +130,20 @@ bool ActiveVerticesConnected::propagate(Solver& solver, Lit p) {
 
     int n = lits_.size();
     solver.registerUndo(var(p), this);
-    for (int i = 0; i < n; ++i) {
-        if (var(lits_[i]) == var(p)) {
-            lbool val = solver.value(lits_[i]);
-            NodeState s;
-            if (val == l_True) {
-                s = kActive;
-                ++n_active_vertices_;
-            } else if (val == l_False) s = kInactive;
-            else abort();
-            // TODO: pass this check (this fails only when invoked from `initialize` and this does not actually cause problems, though)
-            // assert(state_[i] == kUndecided);
-            state_[i] = s;
-            decision_order_.push_back(i);
-        }
+
+    for (auto it = std::lower_bound(var_to_idx_.begin(), var_to_idx_.end(), std::make_pair(var(p), -1)); it != var_to_idx_.end() && it->first == var(p); ++it) {
+        int i = it->second;
+        lbool val = solver.value(lits_[i]);
+        NodeState s;
+        if (val == l_True) {
+            s = kActive;
+            ++n_active_vertices_;
+        } else if (val == l_False) s = kInactive;
+        else abort();
+        // TODO: pass this check (this fails only when invoked from `initialize` and this does not actually cause problems, though)
+        // assert(state_[i] == kUndecided);
+        state_[i] = s;
+        decision_order_.push_back(i);
     }
 
     if (num_pending_propagation() > 0) {
@@ -300,12 +304,11 @@ void ActiveVerticesConnected::calcReason(Solver& solver, Lit p, Lit extra, vec<L
 }
 
 void ActiveVerticesConnected::undo(Solver& solver, Lit p) {
-    for (int i = 0; i < lits_.size(); ++i) {
-        if (var(lits_[i]) == var(p)) {
-            if (state_[i] == kActive) --n_active_vertices_;
-            state_[i] = kUndecided;
-            decision_order_.pop_back();
-        }
+    for (auto it = std::lower_bound(var_to_idx_.begin(), var_to_idx_.end(), std::make_pair(var(p), -1)); it != var_to_idx_.end() && it->first == var(p); ++it) {
+        int i = it->second;
+        if (state_[i] == kActive) --n_active_vertices_;
+        state_[i] = kUndecided;
+        decision_order_.pop_back();
     }
 }
 
