@@ -383,4 +383,18 @@ class BoolOption : public Option
 //=================================================================================================
 }
 
+#ifdef GLUCOSE_FIX_OPTIONS
+
+#define BOOL_OPTION(NAME, C, N, D, V) static constexpr bool NAME = V
+#define INT_OPTION(NAME, C, N, D, DEF, R) static constexpr int NAME = DEF
+#define DOUBLE_OPTION(NAME, C, N, D, DEF, R) static constexpr double NAME = DEF
+
+#else
+
+#define BOOL_OPTION(NAME, C, N, D, V) static BoolOption NAME(C, N, D, V)
+#define INT_OPTION(NAME, C, N, D, DEF, R) static IntOption NAME(C, N, D, DEF, R)
+#define DOUBLE_OPTION(NAME, C, N, D, DEF, R) static DoubleOption NAME(C, N, D, DEF, R)
+
+#endif
+
 #endif

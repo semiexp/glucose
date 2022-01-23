@@ -73,50 +73,50 @@ static const char *_cred = "CORE -- REDUCE";
 static const char *_cm = "CORE -- MINIMIZE";
 
 
-static DoubleOption opt_K(_cr, "K", "The constant used to force restart", 0.8, DoubleRange(0, false, 1, false));
-static DoubleOption opt_R(_cr, "R", "The constant used to block restart", 1.4, DoubleRange(1, false, 5, false));
-static IntOption opt_size_lbd_queue(_cr, "szLBDQueue", "The size of moving average for LBD (restarts)", 50, IntRange(10, INT32_MAX));
-static IntOption opt_size_trail_queue(_cr, "szTrailQueue", "The size of moving average for trail (block restarts)", 5000, IntRange(10, INT32_MAX));
+DOUBLE_OPTION(opt_K, _cr, "K", "The constant used to force restart", 0.8, DoubleRange(0, false, 1, false));
+DOUBLE_OPTION(opt_R, _cr, "R", "The constant used to block restart", 1.4, DoubleRange(1, false, 5, false));
+INT_OPTION(opt_size_lbd_queue, _cr, "szLBDQueue", "The size of moving average for LBD (restarts)", 50, IntRange(10, INT32_MAX));
+INT_OPTION(opt_size_trail_queue, _cr, "szTrailQueue", "The size of moving average for trail (block restarts)", 5000, IntRange(10, INT32_MAX));
 
-static IntOption opt_first_reduce_db(_cred, "firstReduceDB", "The number of conflicts before the first reduce DB (or the size of leernts if chanseok is used)",
+INT_OPTION(opt_first_reduce_db, _cred, "firstReduceDB", "The number of conflicts before the first reduce DB (or the size of leernts if chanseok is used)",
                                      2000, IntRange(0, INT32_MAX));
-static IntOption opt_inc_reduce_db(_cred, "incReduceDB", "Increment for reduce DB", 300, IntRange(0, INT32_MAX));
-static IntOption opt_spec_inc_reduce_db(_cred, "specialIncReduceDB", "Special increment for reduce DB", 1000, IntRange(0, INT32_MAX));
-static IntOption opt_lb_lbd_frozen_clause(_cred, "minLBDFrozenClause", "Protect clauses if their LBD decrease and is lower than (for one turn)", 30,
+INT_OPTION(opt_inc_reduce_db, _cred, "incReduceDB", "Increment for reduce DB", 300, IntRange(0, INT32_MAX));
+INT_OPTION(opt_spec_inc_reduce_db, _cred, "specialIncReduceDB", "Special increment for reduce DB", 1000, IntRange(0, INT32_MAX));
+INT_OPTION(opt_lb_lbd_frozen_clause, _cred, "minLBDFrozenClause", "Protect clauses if their LBD decrease and is lower than (for one turn)", 30,
                                           IntRange(0, INT32_MAX));
-static BoolOption opt_chanseok_hack(_cred, "chanseok",
+BOOL_OPTION(opt_chanseok_hack, _cred, "chanseok",
                                     "Use Chanseok Oh strategy for LBD (keep all LBD<=co and remove half of firstreduceDB other learnt clauses", false);
-static IntOption opt_chanseok_limit(_cred, "co", "Chanseok Oh: all learnt clauses with LBD<=co are permanent", 5, IntRange(2, INT32_MAX));
+INT_OPTION(opt_chanseok_limit, _cred, "co", "Chanseok Oh: all learnt clauses with LBD<=co are permanent", 5, IntRange(2, INT32_MAX));
 
 
-static IntOption opt_lb_size_minimzing_clause(_cm, "minSizeMinimizingClause", "The min size required to minimize clause", 30, IntRange(3, INT32_MAX));
-static IntOption opt_lb_lbd_minimzing_clause(_cm, "minLBDMinimizingClause", "The min LBD required to minimize clause", 6, IntRange(3, INT32_MAX));
+INT_OPTION(opt_lb_size_minimzing_clause, _cm, "minSizeMinimizingClause", "The min size required to minimize clause", 30, IntRange(3, INT32_MAX));
+INT_OPTION(opt_lb_lbd_minimzing_clause, _cm, "minLBDMinimizingClause", "The min LBD required to minimize clause", 6, IntRange(3, INT32_MAX));
 
 
-static DoubleOption opt_var_decay(_cat, "var-decay", "The variable activity decay factor (starting point)", 0.8, DoubleRange(0, false, 1, false));
-static DoubleOption opt_max_var_decay(_cat, "max-var-decay", "The variable activity decay factor", 0.95, DoubleRange(0, false, 1, false));
-static DoubleOption opt_clause_decay(_cat, "cla-decay", "The clause activity decay factor", 0.999, DoubleRange(0, false, 1, false));
-static DoubleOption opt_random_var_freq(_cat, "rnd-freq", "The frequency with which the decision heuristic tries to choose a random variable", 0,
+DOUBLE_OPTION(opt_var_decay, _cat, "var-decay", "The variable activity decay factor (starting point)", 0.8, DoubleRange(0, false, 1, false));
+DOUBLE_OPTION(opt_max_var_decay, _cat, "max-var-decay", "The variable activity decay factor", 0.95, DoubleRange(0, false, 1, false));
+DOUBLE_OPTION(opt_clause_decay, _cat, "cla-decay", "The clause activity decay factor", 0.999, DoubleRange(0, false, 1, false));
+DOUBLE_OPTION(opt_random_var_freq, _cat, "rnd-freq", "The frequency with which the decision heuristic tries to choose a random variable", 0,
                                         DoubleRange(0, true, 1, true));
-static DoubleOption opt_random_seed(_cat, "rnd-seed", "Used by the random variable selection", 91648253, DoubleRange(0, false, HUGE_VAL, false));
-static IntOption opt_ccmin_mode(_cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)", 2, IntRange(0, 2));
-static IntOption opt_phase_saving(_cat, "phase-saving", "Controls the level of phase saving (0=none, 1=limited, 2=full)", 2, IntRange(0, 2));
-static BoolOption opt_rnd_init_act(_cat, "rnd-init", "Randomize the initial activity", false);
-static DoubleOption opt_garbage_frac(_cat, "gc-frac", "The fraction of wasted memory allowed before a garbage collection is triggered", 0.20,
+DOUBLE_OPTION(opt_random_seed, _cat, "rnd-seed", "Used by the random variable selection", 91648253, DoubleRange(0, false, HUGE_VAL, false));
+INT_OPTION(opt_ccmin_mode, _cat, "ccmin-mode", "Controls conflict clause minimization (0=none, 1=basic, 2=deep)", 2, IntRange(0, 2));
+INT_OPTION(opt_phase_saving, _cat, "phase-saving", "Controls the level of phase saving (0=none, 1=limited, 2=full)", 2, IntRange(0, 2));
+BOOL_OPTION(opt_rnd_init_act, _cat, "rnd-init", "Randomize the initial activity", false);
+DOUBLE_OPTION(opt_garbage_frac, _cat, "gc-frac", "The fraction of wasted memory allowed before a garbage collection is triggered", 0.20,
                                      DoubleRange(0, false, HUGE_VAL, false));
-static BoolOption opt_glu_reduction(_cat, "gr", "glucose strategy to fire clause database reduction (must be false to fire Chanseok strategy)", true);
-static BoolOption opt_luby_restart(_cat, "luby", "Use the Luby restart sequence", false);
-static DoubleOption opt_restart_inc(_cat, "rinc", "Restart interval increase factor", 2, DoubleRange(1, false, HUGE_VAL, false));
-static IntOption opt_luby_restart_factor(_cred, "luby-factor", "Luby restart factor", 100, IntRange(1, INT32_MAX));
+BOOL_OPTION(opt_glu_reduction, _cat, "gr", "glucose strategy to fire clause database reduction (must be false to fire Chanseok strategy)", true);
+BOOL_OPTION(opt_luby_restart, _cat, "luby", "Use the Luby restart sequence", false);
+DOUBLE_OPTION(opt_restart_inc, _cat, "rinc", "Restart interval increase factor", 2, DoubleRange(1, false, HUGE_VAL, false));
+INT_OPTION(opt_luby_restart_factor, _cred, "luby-factor", "Luby restart factor", 100, IntRange(1, INT32_MAX));
 
-static IntOption opt_randomize_phase_on_restarts(_cat, "phase-restart",
+INT_OPTION(opt_randomize_phase_on_restarts, _cat, "phase-restart",
                                                  "The amount of randomization for the phase at each restart (0=none, 1=first branch, 2=first branch (no bad clauses), 3=first branch (only initial clauses)",
                                                  0, IntRange(0, 3));
-static BoolOption opt_fixed_randomize_phase_on_restarts(_cat, "fix-phas-rest", "Fixes the first 7 levels at random phase", false);
+BOOL_OPTION(opt_fixed_randomize_phase_on_restarts, _cat, "fix-phas-rest", "Fixes the first 7 levels at random phase", false);
 
-static BoolOption opt_adapt(_cat, "adapt", "Adapt dynamically stategies after 100000 conflicts", true);
+BOOL_OPTION(opt_adapt, _cat, "adapt", "Adapt dynamically stategies after 100000 conflicts", true);
 
-static BoolOption opt_forceunsat(_cat,"forceunsat","Force the phase for UNSAT",true);
+BOOL_OPTION(opt_forceunsat, _cat,"forceunsat","Force the phase for UNSAT",true);
 //=================================================================================================
 // Constructor/Destructor:
 
