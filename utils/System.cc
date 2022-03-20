@@ -20,7 +20,11 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 
 #include "utils/System.h"
 
-#if defined(__linux__)
+#if defined(GLUCOSE_UNUSE_STDIO)
+
+double Glucose::memUsed() { return 0; }
+
+#elif defined(__linux__)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,4 +96,6 @@ double Glucose::memUsed(void) {
 #else
 double Glucose::memUsed() { 
     return 0; }
+#endif
+
 #endif

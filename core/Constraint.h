@@ -3,8 +3,6 @@
 #include "mtl/Vec.h"
 #include "core/SolverTypes.h"
 
-#include <cstdio>
-
 namespace Glucose {
 
 class Solver;

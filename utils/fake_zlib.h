@@ -1,21 +1,19 @@
 #pragma once
 
-#include <cstdio>
-
-using gzFile = FILE*;
+using gzFile = void*;
 
 inline size_t gzread(gzFile fp, void* buf, size_t buf_size) {
-    return fread(buf, 1, buf_size, fp);
+    abort();
 }
 
 inline gzFile gzopen(const char* filename, const char* mode) {
-    return fopen(filename, mode);
+    abort();
 }
 
 inline gzFile gzdopen(int fd, const char* mode) {
-    return fdopen(fd, mode);
+    abort();
 }
 
 inline void gzclose(gzFile fp) {
-    fclose(fp);
+    abort();
 }
