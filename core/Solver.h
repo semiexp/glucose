@@ -120,6 +120,7 @@ public:
     // Problem specification:
     //
     virtual Var     newVar    (bool polarity = true, bool dvar = true); // Add a new variable with parameters specifying variable mode.
+    Var     newNamedVar (const std::string& name);              // Add a variable with name.
     bool    addClause (const vec<Lit>& ps);                     // Add a clause to the solver. 
     bool    addEmptyClause();                                   // Add the empty clause, making the solver contradictory.
     bool    addClause (Lit p);                                  // Add a unit clause to the solver. 
@@ -174,6 +175,7 @@ public:
     int     nLearnts   ()      const;       // The current number of learnt clauses.
     int     nVars      ()      const;       // The current number of variables.
     int     nFreeVars  ()      ;
+    std::string varName (Var x) const;
 
     inline char valuePhase(Var v) {return polarity[v];}
 
@@ -246,6 +248,8 @@ public:
     FILE*               certifiedOutput;
     bool                certifiedUNSAT;
     bool                vbyte;
+
+    bool                dump_analysis_info;
 
     void write_char (unsigned char c);
     void write_lit (int n);
@@ -366,7 +370,8 @@ protected:
     double              progress_estimate;// Set by 'search()'.
     bool                remove_satisfied; // Indicates whether possibly inefficient linear scan for satisfied clauses should be performed in 'simplify'.
     vec<unsigned int>   permDiff;           // permDiff[var] contains the current conflict number... Used to count the number of  LBD
-    
+
+    std::vector<std::string> varNames;    // names of variables
 
     // UPDATEVARACTIVITY trick (see competition'09 companion paper)
     vec<Lit> lastDecisionLevel; 
@@ -553,6 +558,13 @@ inline int      Solver::nVars         ()      const   { return vardata.size(); }
 inline int      Solver::nFreeVars     ()         { 
     int a = stats[dec_vars];
     return (int)(a) - (trail_lim.size() == 0 ? trail.size() : trail_lim[0]); }
+inline std::string Solver::varName (Var x) const {
+    if (x < varNames.size() && !varNames[x].empty()) {
+        return varNames[x];
+    } else {
+        return "<" + std::to_string(x) + ">";
+    }
+}
 inline void     Solver::setPolarity   (Var v, bool b) { polarity[v] = b; }
 inline void     Solver::setDecisionVar(Var v, bool b) 
 { 

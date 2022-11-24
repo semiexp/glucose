@@ -152,6 +152,7 @@ verbosity(0)
 , certifiedOutput(NULL)
 , certifiedUNSAT(false) // Not in the first parallel version
 , vbyte(false)
+, dump_analysis_info(false)
 , panicModeLastRemoved(0), panicModeLastRemovedShared(0)
 , useUnaryWatched(false)
 , promoteOneWatchedClause(true)
@@ -394,6 +395,14 @@ Var Solver::newVar(bool sign, bool dvar) {
     return v;
 }
 
+Var Solver::newNamedVar(const std::string& name) {
+    int v = nVars();
+    while (varNames.size() < v) {
+        varNames.push_back("");
+    }
+    varNames.push_back(name);
+    return newVar();
+}
 
 bool Solver::addClause_(vec <Lit> &ps) {
 
@@ -847,6 +856,14 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
                 }
             }
 
+            if (dump_analysis_info) {
+                printf("propagate along:");
+                for (int j = 0; j < c.size(); ++j) {
+                    Lit q = c[j];
+                    printf(" %s%s", sign(q) ? "!" : "", varName(var(q)).c_str());
+                }
+                printf("\n");
+            }
 
             for(int j = (p == lit_Undef) ? 0 : 1; j < c.size(); j++) {
                 Lit q = c[j];
@@ -976,6 +993,14 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
      } else
 #endif
     szWithoutSelectors = out_learnt.size();
+
+    if (dump_analysis_info) {
+        printf("learnt clause:");
+        for (int i = 0; i < out_learnt.size(); ++i) {
+            printf(" %s%s", sign(out_learnt[i]) ? "!" : "", varName(var(out_learnt[i])).c_str());
+        }
+        printf("\n");
+    }
 
     // Compute LBD
     lbd = computeLBD(out_learnt, out_learnt.size() - selectors.size());
