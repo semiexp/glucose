@@ -97,5 +97,3 @@ double Glucose::memUsed(void) {
 double Glucose::memUsed() { 
     return 0; }
 #endif
-
-#endif

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdlib>
+
 using gzFile = void*;
 
 inline size_t gzread(gzFile fp, void* buf, size_t buf_size) {

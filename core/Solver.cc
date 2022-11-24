@@ -899,7 +899,7 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
         // Select next clause to look at:
         int index_pre = index;
         while (!seen[var(trail[index--])]);
-        for (int i = index + 1; i <= index_pre; ++i) {
+        for (int i = index_pre; i > index; --i) {
             Lit p = trail[i];
             Var x = var(p);
             while (undoLists[x].size() > 0) {
