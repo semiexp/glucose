@@ -802,6 +802,18 @@ void Solver::analyze(CRef confl, Constraint* constr, vec <Lit> &out_learnt, vec 
             constr->calcReason(*this, p, extra, p_reason);
             extra = lit_Undef;
 
+            if (dump_analysis_info) {
+                printf("propagate reason:");
+                if (p != lit_Undef) {
+                    printf("{p: %s%s}", sign(p) ? "!" : "", varName(var(p)).c_str());
+                }
+                for (int j = 0; j < p_reason.size(); ++j) {
+                    Lit q = p_reason[j];
+                    printf(" %s%s", sign(q) ? "!" : "", varName(var(q)).c_str());
+                }
+                printf("\n");
+            }
+
             for (int j = 0; j < p_reason.size(); ++j) {
                 Lit q = p_reason[j];
                 if (!seen[var(q)] && level(var(q)) > 0) {
