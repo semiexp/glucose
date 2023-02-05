@@ -22,6 +22,8 @@ struct OptionalOrderEncoding {
     std::vector<int> values;
 
     bool is_absent() const { return values.size() == 0; }
+    std::optional<Lit> at_least(int x) const;
+    std::optional<Lit> at_most(int x) const;
 };
 
 class GraphDivision : public Constraint {

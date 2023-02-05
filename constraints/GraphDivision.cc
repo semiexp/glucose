@@ -7,6 +7,26 @@
 
 namespace Glucose {
 
+std::optional<Lit> OptionalOrderEncoding::at_least(int x) const {
+    assert(!is_absent());
+
+    if (x <= values[0]) return std::nullopt;
+    if (x > values.back()) return lit_Undef;
+
+    int idx = std::distance(values.begin(), std::lower_bound(values.begin(), values.end(), x));
+    return lits[idx - 1];
+}
+
+std::optional<Lit> OptionalOrderEncoding::at_most(int x) const {
+    assert(!is_absent());
+
+    if (x >= values.back()) return std::nullopt;
+    if (x < values[0]) return lit_Undef;
+
+    int idx = std::distance(values.begin(), std::upper_bound(values.begin(), values.end(), x));
+    return ~lits[idx - 1];
+}
+
 GraphDivision::GraphDivision(const std::vector<OptionalOrderEncoding>& vertices, const std::vector<std::pair<int, int>>& edges, const std::vector<Lit>& edge_lits) :
     vertices_(vertices),
     adj_(vertices_.size()),
@@ -184,8 +204,13 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                 }
                 if (size_ub_[p] < r_size) {
                     std::vector<Lit> ret = reason_decided_region(r);
-                    if (size_ub_reason_[p].has_value()) {
-                        ret.push_back(*size_ub_reason_[p]);
+                    auto x = vertices_[p].at_most(r_size - 1);
+                    if (x.has_value()) {
+                        assert(*x != lit_Undef);
+
+                        // Since this propagator is delayed, lits[i] always implies lits[i-1]
+                        assert(solver.value(*x) == l_True);
+                        ret.push_back(*x);
                     }
                     return ret;
                 }
@@ -201,8 +226,11 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                     if (size_ub_reason_[least_ub_pos].has_value()) {
                         ret.push_back(*size_ub_reason_[least_ub_pos]);
                     }
-                    if (size_lb_reason_[p].has_value()) {
-                        ret.push_back(*size_lb_reason_[p]);
+                    auto x = vertices_[p].at_least(least_ub + 1);
+                    if (x.has_value()) {
+                        assert(*x != lit_Undef);
+                        assert(solver.value(*x) == l_True);
+                        ret.push_back(*x);
                     }
 
                     return ret;
@@ -221,8 +249,11 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
 
                 if (size_lb_[p] > r_size) {
                     std::vector<Lit> ret = reason_potential_region(r);
-                    if (size_lb_reason_[p].has_value()) {
-                        ret.push_back(*size_lb_reason_[p]);
+                    auto x = vertices_[p].at_least(r_size + 1);
+                    if (x.has_value()) {
+                        assert(*x != lit_Undef);
+                        assert(solver.value(*x) == l_True);
+                        ret.push_back(*x);
                     }
 
                     return ret;
