@@ -14,6 +14,8 @@ GraphDivision::GraphDivision(const std::vector<OptionalOrderEncoding>& vertices,
     edge_state_(edge_lits_.size(), EdgeState::kUndecided),
     size_lb_(vertices_.size(), -1),
     size_ub_(vertices_.size(), -1),
+    size_lb_reason_(vertices_.size(), std::nullopt),
+    size_ub_reason_(vertices_.size(), std::nullopt),
     decided_regions_(vertices_.size()),
     decided_region_id_(vertices_.size()),
     potential_regions_(vertices_.size()),
@@ -54,6 +56,13 @@ bool GraphDivision::initialize(Solver& solver) {
 
 bool GraphDivision::propagate(Solver& solver, Lit p) {
     solver.registerUndo(var(p), this);
+
+    if (num_pending_propagation() > 0) {
+        // lazy propagation
+        reasons_.push_back({});
+        return true;
+    }
+
     auto res = run_check(solver);
 
     if (res.has_value()) {
@@ -103,17 +112,40 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
         auto& v = vertices_[i];
         if (v.is_absent()) continue;
 
-        // TODO: use binary search
-        size_lb_[i] = v.values[0];
-        for (int j = 0; j < v.lits.size(); ++j) {
-            if (solver.value(v.lits[j]) == l_True) {
-                size_lb_[i] = v.values[j + 1];
+        {
+            int left = 0;
+            int right = v.values.size() - 1;
+            while (left < right) {
+                int mid = (left + right + 1) / 2;
+                if (solver.value(v.lits[mid - 1]) == l_True) {
+                    left = mid;
+                } else {
+                    right = mid - 1;
+                }
+            }
+            size_lb_[i] = v.values[left];
+            if (left == 0) {
+                size_lb_reason_[i] = std::nullopt;
+            } else {
+                size_lb_reason_[i] = v.lits[left - 1];
             }
         }
-        size_ub_[i] = v.values.back();
-        for (int j = v.lits.size(); j > 0; --j) {
-            if (solver.value(v.lits[j - 1]) == l_False) {
-                size_ub_[i] = v.values[j - 1];
+        {
+            int left = 0;
+            int right = v.values.size() - 1;
+            while (left < right) {
+                int mid = (left + right) / 2;
+                if (solver.value(v.lits[mid]) == l_False) {
+                    right = mid;
+                } else {
+                    left = mid + 1;
+                }
+            }
+            size_ub_[i] = v.values[left];
+            if (left == v.values.size() - 1) {
+                size_ub_reason_[i] = std::nullopt;
+            } else {
+                size_ub_reason_[i] = ~v.lits[left];
             }
         }
     }
@@ -152,11 +184,8 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                 }
                 if (size_ub_[p] < r_size) {
                     std::vector<Lit> ret = reason_decided_region(r);
-                    for (int i = 0; i < vertices_[p].lits.size(); ++i) {
-                        if (solver.value(vertices_[p].lits[i]) == l_False) {
-                            ret.push_back(~vertices_[p].lits[i]);
-                            break;
-                        }
+                    if (size_ub_reason_[p].has_value()) {
+                        ret.push_back(*size_ub_reason_[p]);
                     }
                     return ret;
                 }
@@ -169,17 +198,11 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                     assert(least_ub != -1);
 
                     std::vector<Lit> ret = reason_decided_connecting_path(least_ub_pos, p);
-                    for (int i = 0; i < vertices_[least_ub_pos].lits.size(); ++i) {
-                        if (solver.value(vertices_[least_ub_pos].lits[i]) == l_False) {
-                            ret.push_back(~vertices_[least_ub_pos].lits[i]);
-                            break;
-                        }
+                    if (size_ub_reason_[least_ub_pos].has_value()) {
+                        ret.push_back(*size_ub_reason_[least_ub_pos]);
                     }
-                    for (int i = (int)vertices_[p].lits.size() - 1; i >= 0; --i) {
-                        if (solver.value(vertices_[p].lits[i]) == l_True) {
-                            ret.push_back(vertices_[p].lits[i]);
-                            break;
-                        }
+                    if (size_lb_reason_[p].has_value()) {
+                        ret.push_back(*size_lb_reason_[p]);
                     }
 
                     return ret;
@@ -198,11 +221,8 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
 
                 if (size_lb_[p] > r_size) {
                     std::vector<Lit> ret = reason_potential_region(r);
-                    for (int i = (int)vertices_[p].lits.size() - 1; i >= 0; --i) {
-                        if (solver.value(vertices_[p].lits[i]) == l_True) {
-                            ret.push_back(vertices_[p].lits[i]);
-                            break;
-                        }
+                    if (size_lb_reason_[p].has_value()) {
+                        ret.push_back(*size_lb_reason_[p]);
                     }
 
                     return ret;

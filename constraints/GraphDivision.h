@@ -3,6 +3,7 @@
 #include "core/Constraint.h"
 #include "core/Solver.h"
 
+#include <optional>
 #include <vector>
 #include <algorithm>
 
@@ -58,6 +59,7 @@ private:
 
     std::vector<EdgeState> edge_state_;
     std::vector<int> size_lb_, size_ub_;
+    std::vector<std::optional<Lit>> size_lb_reason_, size_ub_reason_;
 
     std::vector<std::vector<int>> decided_regions_;
     std::vector<int> decided_region_id_;
