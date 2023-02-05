@@ -230,6 +230,44 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
             }
         }
     }
+
+    // 3a. Suppose that, in a potential region, there are some cells whose size bounds do not overlap each other.
+    // Then, the size of the potential region must be at least the sum of the lower bounds.
+    {
+        for (int r = 0; r < n_potential_regions; ++r) {
+            std::vector<std::tuple<int, int, int>> cells;  // (ub, -lb, cell id)
+            for (int p : potential_regions_[r]) {
+                cells.push_back({size_ub_[p], -size_lb_[p], p});
+            }
+            std::sort(cells.begin(), cells.end());
+
+            int cur = 0;
+            int min_required = 0;
+            std::vector<int> non_overlapping_bounds_cells;
+
+            for (auto [ub, lb, p] : cells) {
+                lb = -lb;
+                if (cur < lb) {
+                    min_required += lb;
+                    cur = ub;
+                    non_overlapping_bounds_cells.push_back(p);
+                }
+            }
+
+            if (min_required > potential_regions_[r].size()) {
+                std::vector<Lit> ret = reason_potential_region(r);
+                for (int p : non_overlapping_bounds_cells) {
+                    if (size_lb_reason_[p].has_value()) {
+                        ret.push_back(*size_lb_reason_[p]);
+                    }
+                    if (size_ub_reason_[p].has_value()) {
+                        ret.push_back(*size_ub_reason_[p]);
+                    }
+                }
+                return ret;
+            }
+        }
+    }
     return std::nullopt;
 }
 
