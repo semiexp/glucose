@@ -101,8 +101,16 @@ bool GraphDivision::propagate(Solver& solver, Lit p) {
 void GraphDivision::calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) {
     assert(!reasons_.empty());
 
-    for (auto l : reasons_.back()) {
-        out_reason.push(l);
+    if (p == lit_Undef) {
+        for (auto l : reasons_.back()) {
+            out_reason.push(l);
+        }
+    } else {
+        auto found = reasons_prop_.find(p);
+        assert(found != reasons_prop_.end());
+        for (auto l : found->second) {
+            out_reason.push(l);
+        }
     }
     if (extra != lit_Undef) {
         out_reason.push(extra);
@@ -177,10 +185,16 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
     {
         for (int u = 0; u < vertices_.size(); ++u) {
             for (auto& [v, e] : adj_[u]) {
-                if (decided_region_id_[u] == decided_region_id_[v] && edge_state_[e] == EdgeState::kDisconnected) {
-                    std::vector<Lit> ret = reason_decided_connecting_path(u, v);
-                    ret.push_back(edge_lits_[e]);
-                    return ret;
+                if (decided_region_id_[u] == decided_region_id_[v]) {
+                    if (edge_state_[e] == EdgeState::kDisconnected) {
+                        std::vector<Lit> ret = reason_decided_connecting_path(u, v);
+                        ret.push_back(edge_lits_[e]);
+                        return ret;
+                    } else if (edge_state_[e] == EdgeState::kUndecided) {
+                        std::vector<Lit> ret = reason_decided_connecting_path(u, v);
+                        reasons_prop_[~edge_lits_[e]] = ret;
+                        assert(solver.enqueue(~edge_lits_[e], this));
+                    }
                 }
             }
         }
@@ -214,6 +228,20 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                     }
                     return ret;
                 }
+                if (size_lb_[p] < r_size) {
+                    auto x = vertices_[p].at_least(r_size);
+                    if (x.has_value()) {
+                        // *x == lit_Undef <=> size(p) is always less than r_size
+                        // In this case, size_ub_[p] < r_size should hold
+                        assert(*x != lit_Undef);
+
+                        if (solver.value(*x) == l_Undef) {
+                            std::vector<Lit> ret = reason_decided_region(r);
+                            reasons_prop_[*x] = ret;
+                            assert(solver.enqueue(*x, this));
+                        }
+                    }
+                }
             }
 
             for (int p : decided_regions_[r]) {
@@ -242,13 +270,21 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
     // 3. Within a potential region, size variables of its members are at most the size of the region
     {
         for (int r = 0; r < n_potential_regions; ++r) {
+            std::optional<std::vector<Lit>> reason_r;
+            auto get_reason_r = [&]() {
+                if (!reason_r) {
+                    reason_r = reason_potential_region(r);
+                }
+                return *reason_r;
+            };
+
             int r_size = potential_regions_[r].size();
 
             for (int p : potential_regions_[r]) {
                 if (vertices_[p].is_absent()) continue;
 
                 if (size_lb_[p] > r_size) {
-                    std::vector<Lit> ret = reason_potential_region(r);
+                    std::vector<Lit> ret = get_reason_r();
                     auto x = vertices_[p].at_least(r_size + 1);
                     if (x.has_value()) {
                         assert(*x != lit_Undef);
@@ -257,6 +293,19 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                     }
 
                     return ret;
+                }
+                if (size_ub_[p] > r_size) {
+                    auto x = vertices_[p].at_most(r_size);
+                    if (x.has_value()) {
+                        // *x == lit_Undef <=> size(p) is always more than r_size
+                        // In this case, size_lb_[p] > r_size should hold
+                        assert(*x != lit_Undef);
+                        if (solver.value(*x) == l_Undef) {
+                            std::vector<Lit> ret = get_reason_r();
+                            reasons_prop_[*x] = ret;
+                            assert(solver.enqueue(*x, this));
+                        }
+                    }
                 }
             }
         }

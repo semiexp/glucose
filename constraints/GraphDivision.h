@@ -6,6 +6,7 @@
 #include <optional>
 #include <vector>
 #include <algorithm>
+#include <map>
 
 namespace Glucose {
 
@@ -69,6 +70,7 @@ private:
     std::vector<int> potential_region_id_;
 
     std::vector<std::vector<Lit>> reasons_;
+    std::map<Lit, std::vector<Lit>> reasons_prop_;
 };
 
 }
