@@ -324,8 +324,13 @@ Solver::~Solver() {
 
 
 void Solver::write_char(unsigned char ch) {
+#ifdef _MSC_VER
+    if(putc((int) ch, certifiedOutput) == EOF)
+        exit(1);
+#else
     if(putc_unlocked((int) ch, certifiedOutput) == EOF)
         exit(1);
+#endif
 }
 
 
