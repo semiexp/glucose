@@ -254,6 +254,10 @@ public:
     void write_char (unsigned char c);
     void write_lit (int n);
 
+    // Misc:
+    //
+    int      decisionLevel    ()      const; // Gives the current decisionlevel.
+    int      level            (Var x) const;
 
     // Panic mode. 
     // Save memory
@@ -463,11 +467,9 @@ protected:
 
     // Misc:
     //
-    int      decisionLevel    ()      const; // Gives the current decisionlevel.
     uint32_t abstractLevel    (Var x) const; // Used to represent an abstraction of sets of decision levels.
     CRef     reason           (Var x) const;
     Constraint* nc_reason     (Var x) const;
-    int      level            (Var x) const;
     double   progressEstimate ()      const; // DELETE THIS ?? IT'S NOT VERY USEFUL ...
     bool     withinBudget     ()      const;
     inline bool isSelector(Var v) {return (incremental && v>nbVarsInitialFormula);}
