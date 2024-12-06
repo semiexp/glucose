@@ -67,6 +67,14 @@ bool GraphDivision::initialize(Solver& solver) {
         solver.addWatch(l, this);
     }
 
+    for (int i = 0; i < vertices_.size(); ++i) {
+        if (vertices_[i].is_absent()) continue;
+
+        if (vertices_[i].values[0] > vertices_.size()) {
+            return false;
+        }
+    }
+
     if (run_check(solver).has_value()) {
         return false;
     }
@@ -248,7 +256,7 @@ std::optional<std::vector<Lit>> GraphDivision::run_check(Solver& solver) {
                 if (vertices_[p].is_absent()) continue;
 
                 if (least_ub < size_lb_[p]) {
-                    assert(least_ub != -1);
+                    assert(least_ub_pos != -1);
 
                     std::vector<Lit> ret = reason_decided_connecting_path(least_ub_pos, p);
                     if (size_ub_reason_[least_ub_pos].has_value()) {

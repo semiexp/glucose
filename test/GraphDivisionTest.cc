@@ -221,3 +221,43 @@ DEFINE_TEST(graph_division_complex) {
         {},
     });
 }
+
+DEFINE_TEST(graph_division_out_of_range) {
+    {
+        // Unsatisfiable if there is a vertex with a lower bound larger than the number of vertices,
+        // **not causing runtime error**
+        Solver S;
+
+        std::vector<OptionalOrderEncoding> vertices(2);
+        vertices[0].values.push_back(3);
+
+        std::vector<std::pair<int, int>> graph{{0, 1}};
+
+        std::vector<Lit> lits;
+        for (int i = 0; i < graph.size(); ++i) {
+            lits.push_back(mkLit(S.newVar()));
+        }
+        S.addConstraint(std::make_unique<GraphDivision>(vertices, graph, lits));
+
+        assert(S.solve() == false);
+    }
+
+    {
+        // Unsatisfiable if there is a vertex with a lower bound larger than the size of the possible region
+        Solver S;
+
+        std::vector<OptionalOrderEncoding> vertices(3);
+        vertices[0].values.push_back(3);
+
+        std::vector<std::pair<int, int>> graph{{0, 1}, {1, 2}};
+
+        std::vector<Lit> lits;
+        for (int i = 0; i < graph.size(); ++i) {
+            lits.push_back(mkLit(S.newVar()));
+        }
+        S.addClause(lits[1]);
+        S.addConstraint(std::make_unique<GraphDivision>(vertices, graph, lits));
+
+        assert(S.solve() == false);
+    }
+}
