@@ -21,6 +21,8 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #ifndef Glucose_Alloc_h
 #define Glucose_Alloc_h
 
+#include <cstdlib>
+
 #include "mtl/XAlloc.h"
 #include "mtl/Vec.h"
 
@@ -107,7 +109,7 @@ void RegionAllocator<T>::capacity(uint32_t min_cap)
         cap += delta;
 
         if (cap <= prev_cap)
-            throw OutOfMemoryException();
+            abort();  // throw OutOfMemoryException();
     }
     //printf(" .. (%p) cap = %u\n", this, cap);
 
@@ -129,7 +131,7 @@ RegionAllocator<T>::alloc(int size)
     
     // Handle overflow:
     if (sz < prev_sz)
-        throw OutOfMemoryException();
+        abort();  // throw OutOfMemoryException();
 
     return prev_sz;
 }
